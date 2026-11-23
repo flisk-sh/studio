@@ -55,6 +55,16 @@ function resample(src, sx, sy, sw, sh, w, h, white) {
   return c;
 }
 
+// A small picture of page 1 plus the page count, for the list of picked files.
+export async function pdfThumb(file) {
+  const src = await pdfjsLib.getDocument({data: await file.arrayBuffer()}).promise;
+  const pg = await src.getPage(1), base = pg.getViewport({scale: 1}), vp = pg.getViewport({scale: 120 / base.width});
+  const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+  await pg.render({canvasContext: c.getContext('2d'), viewport: vp}).promise;
+  const out = {url: c.toDataURL('image/jpeg', 0.7), pages: src.numPages};
+  await src.destroy(); return out;
+}
+
 export async function photoBatch(files, o, say) {
   const zip = new JSZip(); const items = []; const used = new Set(); let before = 0, after = 0, i = 0;
   for (const f of files) {

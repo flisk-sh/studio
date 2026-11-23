@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import {Button} from '@astryxdesign/core/Button';
 import {Text} from '@astryxdesign/core/Text';
 import {Heading} from '@astryxdesign/core/Heading';
@@ -7,9 +7,9 @@ import {FileInput} from '@astryxdesign/core/FileInput';
 import {NumberInput} from '@astryxdesign/core/NumberInput';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Banner} from '@astryxdesign/core/Banner';
-import {PhotoIcon, DocumentDuplicateIcon, ArrowsPointingInIcon, PencilSquareIcon, ArrowUpRightIcon, ChevronDownIcon} from '@heroicons/react/24/outline';
+import {PhotoIcon, DocumentDuplicateIcon, ArrowsPointingInIcon, PencilSquareIcon, ArrowUpRightIcon, ChevronDownIcon, ChevronUpIcon, XMarkIcon} from '@heroicons/react/24/outline';
 import {Demo} from './Demos.jsx';
-import {photoBatch, pdfBatch, initUnlock, FREE_FOR_NOW, FREE_FILES, MARK, PAYMENT_LINK, UNLOCK_TOKEN} from './engine.js';
+import {pdfThumb, photoBatch, pdfBatch, initUnlock, FREE_FOR_NOW, FREE_FILES, MARK, PAYMENT_LINK, UNLOCK_TOKEN} from './engine.js';
 
 const TASKS = [
   ['photo', 'Photos', 'Resize, crop square, compress, add a mark, get a ZIP'],
@@ -30,6 +30,31 @@ const friendly = (e) => {
   if (/source image|decode|InvalidState|bitmap/i.test(m)) return 'One of the images could not be read. HEIC photos are not supported in this browser yet: export them as JPEG first.';
   return 'Failed: ' + m;
 };
+// One picked file: a thumbnail, its name and size, and buttons to remove it (and, for merging, to move it).
+function PickedFile({file, index, count, canMove, onRemove, onMove}) {
+  const [thumb, setThumb] = useState(null), [pages, setPages] = useState(0), [bad, setBad] = useState(false);
+  useEffect(() => {
+    let dead = false, url = null;
+    if (file.type.startsWith('image/')) { url = URL.createObjectURL(file); setThumb(url); }
+    else pdfThumb(file).then((r) => { if (!dead) { setThumb(r.url); setPages(r.pages); } }).catch(() => !dead && setBad(true));
+    return () => { dead = true; if (url) URL.revokeObjectURL(url); };
+  }, [file]);
+  return (
+    <div className="picked">
+      <div className="picked-thumb">{thumb ? <img src={thumb} alt="" /> : <span className="picked-wait">{bad ? 'PDF' : '…'}</span>}</div>
+      <div className="picked-info">
+        <Text weight="semibold" className="picked-name">{file.name}</Text>
+        <Text type="supporting" color="secondary">{kbs(file.size)}{pages ? ` · ${pages} page${pages > 1 ? 's' : ''}` : ''}{bad ? ' · cannot be read' : ''}</Text>
+      </div>
+      <HStack gap={1}>
+        {canMove && <Button label="Move up" isIconOnly icon={<ChevronUpIcon width="16" height="16" />} size="sm" variant="ghost" isDisabled={index === 0} onClick={() => onMove(index, -1)} />}
+        {canMove && <Button label="Move down" isIconOnly icon={<ChevronDownIcon width="16" height="16" />} size="sm" variant="ghost" isDisabled={index === count - 1} onClick={() => onMove(index, 1)} />}
+        <Button label={'Remove ' + file.name} isIconOnly icon={<XMarkIcon width="16" height="16" />} size="sm" variant="ghost" onClick={() => onRemove(index)} />
+      </HStack>
+    </div>
+  );
+}
+
 const kbs = (n) => (n / 1024).toFixed(0) + ' KB';
 function Viewer({result, onClose}) {
   const [open, setOpen] = useState(0);
@@ -87,7 +112,10 @@ export default function App() {
   const [quality, setQuality] = useState(82);
   const [mark, setMark] = useState('');
 
-  const onFiles = (v) => setFiles(v ? [].concat(v) : []);
+  // Picking again adds to the list (it no longer replaces it), skipping a file that is already there.
+  const onFiles = (v) => setFiles((old) => { const add = (v ? [].concat(v) : []).filter((f) => !old.some((o) => o.name === f.name && o.size === f.size && o.lastModified === f.lastModified)); return old.concat(add); });
+  const removeAt = (i) => setFiles((old) => old.filter((_, j) => j !== i));
+  const moveAt = (i, d) => setFiles((old) => { const n = old.slice(); const [x] = n.splice(i, 1); n.splice(i + d, 0, x); return n; });
   const pick = (t) => { setTask(t); setFiles([]); setLog(''); setResult(null); if (t === 'shrink' && quality > 95) setQuality(60); };
   const run = async () => {
     let list = files;
@@ -131,7 +159,16 @@ export default function App() {
           <VStack gap={4}>
             <div className="task-head"><span className="task-copy"><Heading level={2}>{cur[1]}</Heading><Text color="secondary">{cur[2]}</Text></span><Demo kind={task} /></div>
             <FileInput key={task} label={mode === 'photo' ? 'Photos' : 'PDF files'} isLabelHidden isMultiple mode="dropzone"
-              accept={mode === 'photo' ? 'image/*' : 'application/pdf'} value={files} onChange={onFiles} />
+              accept={mode === 'photo' ? 'image/*' : 'application/pdf'} value={[]} onChange={onFiles} />
+            {files.length > 0 && (
+              <VStack gap={2}>
+                <HStack gap={2} align="center" justify="space-between">
+                  <Text weight="semibold">{files.length} file{files.length > 1 ? 's' : ''} picked{task === 'merge' && files.length > 1 ? ' (merged in this order)' : ''}</Text>
+                  <Button label="Clear all" size="sm" variant="ghost" onClick={() => setFiles([])} />
+                </HStack>
+                <div className="picked-list">{files.map((f, i) => <PickedFile key={f.name + f.size + f.lastModified + i} file={f} index={i} count={files.length} canMove={task === 'merge'} onRemove={removeAt} onMove={moveAt} />)}</div>
+              </VStack>
+            )}
             {mode === 'photo' ? (
               <VStack gap={3}>
                 <NumberInput label="Size in pixels (longest side, or the square)" value={size} onChange={(v) => v && setSize(v)} />

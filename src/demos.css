@@ -107,3 +107,12 @@
   .side-h{display:none}.side-item{flex:none}.side-item.on::before{display:none}
   .content{padding:16px 16px 48px}.task-head .demo{width:100%;height:auto}
 }
+
+/* picked files */
+.picked-list{display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto}
+.picked{display:flex;align-items:center;gap:12px;padding:8px;border:1px solid color-mix(in srgb,currentColor 16%,transparent);border-radius:12px}
+.picked-thumb{flex:none;width:56px;height:56px;border-radius:8px;overflow:hidden;background:color-mix(in srgb,currentColor 6%,transparent);display:flex;align-items:center;justify-content:center}
+.picked-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.picked-wait{font-size:12px;opacity:.6}
+.picked-info{flex:1;min-width:0;display:flex;flex-direction:column}
+.picked-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
