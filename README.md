@@ -23,6 +23,10 @@ There is no server for your files. Everything runs in the page, using your own c
 
 Free for now, with no limits and no accounts.
 
+## For AI agents
+
+A local MCP server (resize photos, merge and watermark PDFs on your own files) is in [`mcp/`](mcp/).
+
 ## Run it yourself
 
 You need [Bun](https://bun.sh).
