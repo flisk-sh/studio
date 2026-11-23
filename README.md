@@ -19,9 +19,9 @@ After each run you see the result (thumbnails or the PDF itself, with sizes) and
 
 There is no server for your files. Everything runs in the page, using your own computer. You can turn off your network after the page has loaded and it still works.
 
-## Free and unlocked
+## Free
 
-The free version handles 5 files per batch and adds a small "flisk studio" mark to the output. A one-time payment removes both. There are no accounts.
+Free for now, with no limits and no accounts.
 
 ## Run it yourself
 

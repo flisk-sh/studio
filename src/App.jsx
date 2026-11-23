@@ -8,7 +8,7 @@ import {NumberInput} from '@astryxdesign/core/NumberInput';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Demo} from './Demos.jsx';
-import {photoBatch, pdfBatch, initUnlock, FREE_FILES, MARK, PAYMENT_LINK, UNLOCK_TOKEN} from './engine.js';
+import {photoBatch, pdfBatch, initUnlock, FREE_FOR_NOW, FREE_FILES, MARK, PAYMENT_LINK, UNLOCK_TOKEN} from './engine.js';
 
 const TASKS = [
   ['photo', 'Photos', 'Resize, crop square, compress, add a mark, get a ZIP'],
@@ -107,7 +107,7 @@ export default function App() {
         <Button label={busy ? 'Working…' : 'Process'} variant="primary" size="lg" isDisabled={busy || !files.length} onClick={run} />
         {log && <Text color="secondary">{log}</Text>}
         {result && <Viewer result={result} onClose={() => setResult(null)} />}
-        {unlocked
+        {FREE_FOR_NOW ? <Banner type="info" description="Free for now: no limits, no mark. Your files never leave your computer." /> : unlocked
           ? <Banner type="success" description={<>Unlocked: no limits and no mark. To unlock another browser or device, <a href={`${location.origin}${location.pathname}?unlocked=${UNLOCK_TOKEN}`}>bookmark this link</a>.</>} />
           : <Banner type="info" description={<>Free: {FREE_FILES} files per batch and a small "{MARK}" mark.{PAYMENT_LINK.includes('REPLACE_ME') ? '' : <> <a href={PAYMENT_LINK}>Unlock for good</a>: one payment, no account.</>}</>} />}
       </VStack>

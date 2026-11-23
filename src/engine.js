@@ -14,6 +14,8 @@ export const kb = (n) => (n / 1024).toFixed(0) + ' KB';
 export const PAYMENT_LINK = 'https://buy.stripe.com/REPLACE_ME';
 export const UNLOCK_TOKEN = 'REPLACE_WITH_RANDOM_STRING';
 const KEY = 'studio-unlocked';
+// Free for now: no file limit and no mark. Set to false to bring back the free tier and the Stripe unlock.
+export const FREE_FOR_NOW = true;
 export const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* storage blocked */ } },
@@ -21,7 +23,7 @@ export const store = {
 export function initUnlock() {
   const qs = new URLSearchParams(location.search);
   if (qs.get('unlocked') === UNLOCK_TOKEN) { store.set(KEY, '1'); history.replaceState(null, '', location.pathname); }
-  return store.get(KEY) === '1';
+  return FREE_FOR_NOW || store.get(KEY) === '1';
 }
 
 function stamp(g, w, h, text, unlocked) {
