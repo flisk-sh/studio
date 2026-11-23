@@ -29,6 +29,13 @@ const TaskRow = ({id, title, text, on, pick}) => (
   </button>
 );
 
+const friendly = (e) => {
+  const m = String(e && e.message || e);
+  if (/encrypt|password/i.test(m)) return 'This PDF is protected with a password. Remove the password first, then try again.';
+  if (/invalid pdf|no pdf header|failed to parse/i.test(m)) return 'One of the files is not a valid PDF.';
+  if (/source image|decode|InvalidState|bitmap/i.test(m)) return 'One of the images could not be read. HEIC photos are not supported in this browser yet: export them as JPEG first.';
+  return 'Failed: ' + m;
+};
 const kbs = (n) => (n / 1024).toFixed(0) + ' KB';
 function Viewer({result, onClose}) {
   const [open, setOpen] = useState(0);
@@ -48,6 +55,7 @@ function Viewer({result, onClose}) {
       <div className="stage">
         {it.kind === 'image' ? <img src={it.url} alt={it.name} /> : <iframe title={it.name} src={it.url} />}
       </div>
+      {it.kind === 'image' && Math.max(...String(it.dims).split(' × ').map(Number)) < 1000 && <Banner type="warning" description="This is small. Text may be hard to read. Close this, set 1600 px or more (PNG for text) and run again; your files are still selected." />}
       <Text type="supporting" color="secondary">{it.name}{it.dims ? ' · ' + it.dims + ' px' : ''}{it.before ?` · ${kbs(it.before)} → ${kbs(it.after)}` : ''}</Text>
     </VStack>
   );
@@ -78,7 +86,7 @@ export default function App() {
       const r = mode === 'photo' ? await photoBatch(list, o, setLog) : await pdfBatch(list, o, setLog);
       setResult((old) => { (old && old.items || []).forEach((i) => URL.revokeObjectURL(i.url)); return r; });
       setLog(r.msg + (list.length < files.length ? ` Free batch is ${FREE_FILES} files, so the first ${FREE_FILES} were used.` : ''));
-    } catch (e) { setLog('Failed: ' + (e && e.message || e)); }
+    } catch (e) { setLog(friendly(e)); }
     setBusy(false);
   };
 
@@ -96,6 +104,8 @@ export default function App() {
         {mode === 'photo' ? (
           <VStack gap={3}>
             <NumberInput label="Size in pixels (longest side, or the square)" value={size} onChange={(v) => v && setSize(v)} />
+            <HStack gap={2} wrap="wrap">{[[500, 'Thumbnail 500'], [1200, 'Web 1200'], [2000, 'Documents 2000']].map(([v, l]) => <Button key={v} label={l} size="sm" variant={size === v ? 'primary' : 'secondary'} onClick={() => setSize(v)} />)}</HStack>
+            {size < 1000 && <Text type="supporting" color="warning">Small size: text in documents, screenshots and photos of paper will be hard to read. Use 1600 px or more, and PNG, for anything with text.</Text>}
             <Choice value={square} set={setSquare} options={[['fit', 'Keep proportions'], ['square', 'Square crop']]} />
             <Choice value={format} set={setFormat} options={[['jpg', 'JPEG (smaller)'], ['png', 'PNG (sharp text)']]} />
             <NumberInput label="JPEG quality, %" value={quality} onChange={(v) => v && setQuality(Math.min(100, Math.max(30, v)))} />
