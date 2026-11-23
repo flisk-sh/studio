@@ -48,7 +48,7 @@ function Viewer({result, onClose}) {
       <div className="stage">
         {it.kind === 'image' ? <img src={it.url} alt={it.name} /> : <iframe title={it.name} src={it.url} />}
       </div>
-      <Text type="supporting" color="secondary">{it.name}{it.before ? ` · ${kbs(it.before)} → ${kbs(it.after)}` : ''}</Text>
+      <Text type="supporting" color="secondary">{it.name}{it.dims ? ' · ' + it.dims + ' px' : ''}{it.before ?` · ${kbs(it.before)} → ${kbs(it.after)}` : ''}</Text>
     </VStack>
   );
 }
@@ -63,6 +63,7 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [size, setSize] = useState(1200);
   const [square, setSquare] = useState('fit');
+  const [format, setFormat] = useState('jpg');
   const [quality, setQuality] = useState(82);
   const [mark, setMark] = useState('');
 
@@ -73,7 +74,7 @@ export default function App() {
     if (!unlocked && list.length > FREE_FILES) { list = list.slice(0, FREE_FILES); }
     setBusy(true); setLog('Working…');
     try {
-      const o = {unlocked, mark: mark.trim(), quality, size, square: square === 'square', action};
+      const o = {unlocked, mark: mark.trim(), quality, size, format, square: square === 'square', action};
       const r = mode === 'photo' ? await photoBatch(list, o, setLog) : await pdfBatch(list, o, setLog);
       setResult((old) => { (old && old.items || []).forEach((i) => URL.revokeObjectURL(i.url)); return r; });
       setLog(r.msg + (list.length < files.length ? ` Free batch is ${FREE_FILES} files, so the first ${FREE_FILES} were used.` : ''));
@@ -96,6 +97,7 @@ export default function App() {
           <VStack gap={3}>
             <NumberInput label="Size in pixels (longest side, or the square)" value={size} onChange={(v) => v && setSize(v)} />
             <Choice value={square} set={setSquare} options={[['fit', 'Keep proportions'], ['square', 'Square crop']]} />
+            <Choice value={format} set={setFormat} options={[['jpg', 'JPEG (smaller)'], ['png', 'PNG (sharp text)']]} />
             <NumberInput label="JPEG quality, %" value={quality} onChange={(v) => v && setQuality(Math.min(100, Math.max(30, v)))} />
           </VStack>
         ) : task === 'shrink' ? (

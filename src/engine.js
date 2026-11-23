@@ -32,6 +32,19 @@ function stamp(g, w, h, text, unlocked) {
   if (!unlocked) { g.font = `600 ${Math.round(fs * 0.6)}px sans-serif`; g.textAlign = 'right'; draw(MARK, w - fs / 2, h - fs / 2, 0.7); }
 }
 
+// Shrink in halves, then the last step with high-quality smoothing: one big jump makes text jagged and unreadable.
+function resample(src, sx, sy, sw, sh, w, h) {
+  let cur = src, cx = sx, cy = sy, cw = sw, ch = sh;
+  while (cw / 2 > w && ch / 2 > h) {
+    const t = document.createElement('canvas'); t.width = Math.ceil(cw / 2); t.height = Math.ceil(ch / 2);
+    const g = t.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(cur, cx, cy, cw, ch, 0, 0, t.width, t.height);
+    cur = t; cx = 0; cy = 0; cw = t.width; ch = t.height;
+  }
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(cur, cx, cy, cw, ch, 0, 0, w, h);
+  return c;
+}
+
 export async function photoBatch(files, o, say) {
   const zip = new JSZip(); const items = []; let before = 0, after = 0, i = 0;
   for (const f of files) {
@@ -40,13 +53,14 @@ export async function photoBatch(files, o, say) {
     let sw = bmp.width, sh = bmp.height, sx = 0, sy = 0, w, h;
     if (o.square) { const s = Math.min(sw, sh); sx = (sw - s) / 2; sy = (sh - s) / 2; sw = sh = s; w = h = Math.min(o.size, s); }
     else { const k = Math.min(1, o.size / Math.max(sw, sh)); w = Math.round(sw * k); h = Math.round(sh * k); }
-    const c = document.createElement('canvas'); c.width = w; c.height = h;
-    const g = c.getContext('2d'); g.drawImage(bmp, sx, sy, sw, sh, 0, 0, w, h); bmp.close();
+    const c = resample(bmp, sx, sy, sw, sh, w, h); bmp.close();
+    const g = c.getContext('2d');
     stamp(g, w, h, o.mark, o.unlocked);
-    const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', o.quality / 100));
+    const png = o.format === 'png';
+    const blob = await new Promise((r) => c.toBlob(r, png ? 'image/png' : 'image/jpeg', o.quality / 100));
     before += f.size; after += blob.size;
-    const nm = f.name.replace(/\.[^.]+$/, '') + '.jpg';
-    zip.file(nm, blob); items.push({name: nm, kind: 'image', url: URL.createObjectURL(blob), before: f.size, after: blob.size});
+    const nm = f.name.replace(/\.[^.]+$/, '') + (png ? '.png' : '.jpg');
+    zip.file(nm, blob); items.push({name: nm, kind: 'image', dims: w + ' × ' + h, url: URL.createObjectURL(blob), before: f.size, after: blob.size});
   }
   return {blob: await zip.generateAsync({type: 'blob'}), name: 'photos.zip', items, msg: `Done. ${files.length} photo(s), ${kb(before)} → ${kb(after)}.`};
 }
@@ -82,7 +96,7 @@ export async function pdfBatch(files, o, say) {
       out = await PDFDocument.create();
       for (let n = 1; n <= src.numPages; n++) {
         say(`PDF ${i} of ${files.length}: page ${n} of ${src.numPages}…`);
-        const pg = await src.getPage(n), vp = pg.getViewport({scale: 1.5});
+        const pg = await src.getPage(n), vp = pg.getViewport({scale: 2});
         const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
         await pg.render({canvasContext: c.getContext('2d'), viewport: vp}).promise;
         const jpg = await new Promise((r) => c.toBlob(r, 'image/jpeg', o.quality / 100));

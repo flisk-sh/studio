@@ -1,28 +1,44 @@
-# Studio
+# Local Studio
 
-Batch photo and PDF tools that run entirely in your browser. Files never leave your computer.
+Resize, compress and watermark photos and PDFs in your browser. Your files never leave your computer.
 
-- **Photos**: resize, square-crop, compress, add a watermark, download a ZIP.
-- **PDF**: merge, shrink (re-render pages as JPEG, which also strips hidden text and metadata), add a watermark.
+**Use it: [studio.flisk.si](https://studio.flisk.si/)**
 
-Free: 5 files per batch and a small "flisk studio" mark on the output.
-Unlock: one Stripe Payment Link, no accounts, no database.
+## What it does
 
-## Unlock
+| Task | What you get |
+|------|--------------|
+| Photos | Resize to a size you choose, crop square, compress, add a text mark, download a ZIP. Save as JPEG (smaller) or PNG (sharp text). |
+| Merge PDFs | Join several PDFs into one file. |
+| Shrink PDFs | Make big PDFs small. Pages are re-drawn as images, which also removes hidden text and metadata, so the text can no longer be selected. |
+| Watermark PDFs | Put your text across every page. |
 
-Set `PAYMENT_LINK` and the redirect in `src/engine.js`. In Stripe, set the Payment Link's
-after-payment redirect to `https://<host>/?unlocked=<UNLOCK_TOKEN>`. The page stores the unlock in
-`localStorage`. This is an honour-system gate (anyone can read the token from the page source); it
-suits a $9-$19 tool, not a licence you must protect.
+After each run you see the result (thumbnails or the PDF itself, with sizes) and download it from there.
 
-## Run
+## Private by design
 
-    bunx wrangler@4 dev      # local preview
-    bunx wrangler@4 deploy   # publish
+There is no server for your files. Everything runs in the page, using your own computer. You can turn off your network after the page has loaded and it still works.
 
-## Build
+## Free and unlocked
 
-React 19 with Meta Astryx (`@astryxdesign/core`), built by Vite into `dist/`.
+The free version handles 5 files per batch and adds a small "flisk studio" mark to the output. A one-time payment removes both. There are no accounts.
 
-    bun install \&\& bun run build
+## Run it yourself
 
+You need [Bun](https://bun.sh).
+
+```bash
+bun install
+bun run dev      # local preview
+bun run build    # builds ./dist
+```
+
+The page is a React app using [Astryx](https://github.com/meta/astryx) components, with pdf-lib, pdf.js and JSZip doing the file work. It is served as static files from a Cloudflare Worker (`wrangler.toml`).
+
+## Contributing
+
+Issues and pull requests are welcome. Please keep it local-first: no feature should upload a visitor's files.
+
+## License
+
+MIT
