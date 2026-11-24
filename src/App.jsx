@@ -8,12 +8,14 @@ import {NumberInput} from '@astryxdesign/core/NumberInput';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Slider} from '@astryxdesign/core/Slider';
 import {Banner} from '@astryxdesign/core/Banner';
-import {PhotoIcon, DocumentDuplicateIcon, ArrowsPointingInIcon, PencilSquareIcon, ArrowUpRightIcon, ChevronDownIcon, ChevronUpIcon, XMarkIcon} from '@heroicons/react/24/outline';
+import {PhotoIcon, DocumentDuplicateIcon, ArrowsPointingInIcon, PencilSquareIcon, ArrowUpRightIcon, ChevronDownIcon, ChevronUpIcon, XMarkIcon, PaintBrushIcon} from '@heroicons/react/24/outline';
 import {Demo} from './Demos.jsx';
+import Editor from './Editor.jsx';
 import {pdfThumb, photoBatch, pdfBatch, matrix, buildVariant, initUnlock, FREE_FOR_NOW, FREE_FILES, MARK, PAYMENT_LINK, UNLOCK_TOKEN} from './engine.js';
 
 const TASKS = [
   ['photo', 'Photos', 'Resize, crop square, compress, add a mark, get a ZIP'],
+  ['editor', 'Editor', 'Remove the background, crop, rotate, adjust and resize one photo'],
   ['merge', 'Merge PDFs', 'Join several PDFs into one file'],
   ['shrink', 'Shrink PDFs', 'Make big PDFs small and strip hidden text'],
   ['mark', 'Watermark PDFs', 'Put your text across every page'],
@@ -140,10 +142,10 @@ function Downloads({result}) {
   );
 }
 
-const ICONS = {photo: PhotoIcon, merge: DocumentDuplicateIcon, shrink: ArrowsPointingInIcon, mark: PencilSquareIcon};
+const ICONS = {photo: PhotoIcon, editor: PaintBrushIcon, merge: DocumentDuplicateIcon, shrink: ArrowsPointingInIcon, mark: PencilSquareIcon};
 const RESOURCES = [['Source', 'https://github.com/flisk-sh/studio'], ['Flisk', 'https://flisk.si/'], ['Report a problem', 'https://github.com/flisk-sh/studio/issues']];
 
-const startTask = () => { const h = location.hash.slice(1); return ['photo', 'merge', 'shrink', 'mark'].includes(h) ? h : 'photo'; };
+const startTask = () => { const h = location.hash.slice(1); return ['photo', 'editor', 'merge', 'shrink', 'mark'].includes(h) ? h : 'photo'; };
 
 export default function App() {
   const unlocked = unlockedAtLoad;
@@ -192,9 +194,10 @@ export default function App() {
             <a key={label} className="side-item link" href={href} target="_blank" rel="noopener noreferrer"><span>{label}</span><ArrowUpRightIcon width="14" height="14" /></a>
           ))}
         </nav>
-        <main className="content">
+        <main className={'content' + (task === 'editor' ? ' wide' : '')}>
           <VStack gap={4}>
             <div className="task-head"><span className="task-copy"><Heading level={2}>{cur[1]}</Heading><Text color="secondary">{cur[2]}</Text></span><Demo kind={task} /></div>
+            {task === 'editor' ? <Editor /> : (<>
             <FileInput key={task} label={mode === 'photo' ? 'Photos' : 'PDF files'} isLabelHidden isMultiple mode="dropzone"
               accept={mode === 'photo' ? 'image/*' : 'application/pdf'} value={[]} onChange={onFiles} />
             {files.length > 0 && (
@@ -242,6 +245,7 @@ export default function App() {
             {FREE_FOR_NOW ? <Banner type="info" description="Free for now: no limits, no mark. Your files never leave your computer." /> : unlocked
               ? <Banner type="success" description={<>Unlocked: no limits and no mark. To unlock another browser or device, <a href={`${location.origin}${location.pathname}?unlocked=${UNLOCK_TOKEN}`}>bookmark this link</a>.</>} />
               : <Banner type="info" description={<>Free: {FREE_FILES} files per batch and a small "{MARK}" mark.{PAYMENT_LINK.includes('REPLACE_ME') ? '' : <> <a href={PAYMENT_LINK}>Unlock for good</a>: one payment, no account.</>}</>} />}
+            </>)}
           </VStack>
         </main>
       </div>

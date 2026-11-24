@@ -4,6 +4,7 @@ export async function give(page, specs) {
     const mkimg = async (s) => {
       const k = document.createElement('canvas'); k.width = s.w; k.height = s.h; const g = k.getContext('2d');
       if (s.draw === 'transparent') { g.fillStyle = 'red'; g.fillRect(s.w / 4, s.h / 4, 50, 50); }
+      else if (s.draw === 'subject') { g.fillStyle = '#2b6cff'; g.fillRect(0, 0, s.w, s.h); g.fillStyle = '#e53935'; g.beginPath(); g.arc(s.w / 2, s.h / 2, Math.min(s.w, s.h) / 4, 0, 7); g.fill(); }
       else if (s.draw === 'text') { g.fillStyle = '#fff'; g.fillRect(0, 0, s.w, s.h); g.fillStyle = '#111'; g.font = s.w / 45 + 'px sans-serif'; for (let i = 0; i < 12; i++) g.fillText('Row ' + i + ' Invoice 114 Total 1,240.00 EUR IBAN SI56 1920', s.w / 40, s.w / 25 * (i + 1)); }
       else { for (let i = 0; i < 300; i++) { g.fillStyle = `hsl(${i * 7 % 360},70%,50%)`; g.fillRect(Math.random() * s.w, Math.random() * s.h, s.w / 8, s.h / 8); } }
       const type = s.type || 'image/png';

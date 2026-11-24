@@ -20,6 +20,13 @@ export function Demo({kind}) {
         <circle className="ok" cx="186" cy="14" r="5" /><path className="tk" d="M183.4 14l2 2 3.4-4" />
         <Cursor cls="pc" />
       </>)}
+      {kind === 'editor' && (<>
+        <g className="big"><rect x="12" y="12" width="56" height="36" rx="3" /><circle cx="40" cy="26" r="7" /><path d="M26 48c2-9 8-12 14-12s12 3 14 12" /></g>
+        <path className="pt" d="M74 30H112" />
+        <g className="sm" style={{transform: 'translate(122px,12px)'}}><rect x="0" y="0" width="56" height="36" rx="3" className="zone" /><circle cx="28" cy="14" r="7" /><path d="M14 36c2-9 8-12 14-12s12 3 14 12" /></g>
+        <circle className="ok" cx="186" cy="14" r="5" /><path className="tk" d="M183.4 14l2 2 3.4-4" />
+        <Cursor cls="pc" />
+      </>)}
       {kind === 'merge' && (<>
         <Doc x={36} y={16} cls="da" /><Doc x={66} y={16} cls="db" />
         <path className="pt" d="M104 30H122" />
