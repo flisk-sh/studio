@@ -12,6 +12,8 @@ import {NEUTRAL, FILTER_OK, MAX_EDGE, loadCanvas, cropCanvas, rotateCanvas, flip
 const TOOLS = [['bg', 'Remove background', SparklesIcon], ['crop', 'Crop', ScissorsIcon], ['turn', 'Rotate & flip', ArrowPathIcon], ['adjust', 'Adjust', AdjustmentsHorizontalIcon], ['size', 'Resize', ArrowsPointingOutIcon], ['text', 'Text', PencilSquareIcon], ['pieces', 'Move pieces', Squares2X2Icon], ['brush', 'Brush', PaintBrushIcon]];
 const RATIOS = [['free', 'Free', null], ['1:1', '1:1', 1], ['4:3', '4:3', 4 / 3], ['3:2', '3:2', 3 / 2], ['16:9', '16:9', 16 / 9], ['3:4', '3:4', 3 / 4], ['9:16', '9:16', 9 / 16]];
 const LOOKS = [['Original', NEUTRAL], ['Vivid', {...NEUTRAL, contrast: 112, saturation: 140}], ['Warm', {...NEUTRAL, sepia: 30, saturation: 115, brightness: 104}], ['Soft', {...NEUTRAL, contrast: 88, brightness: 106, blur: 0.6}], ['Black & white', {...NEUTRAL, gray: 100, contrast: 108}], ['Sepia', {...NEUTRAL, sepia: 85}]];
+// Only chat may command Studio, and only from its own origin (a local one for development).
+const isChat = (o) => o === 'https://chat.flisk.si' || /^http:\/\/localhost(:\d+)?$/.test(o);
 const HISTORY = 8;
 const BEHIND = [['White', '#ffffff'], ['Black', '#000000'], ['Grey', '#9aa0a6'], ['Blue', '#2b6cff'], ['Green', '#2f9e5b'], ['Yellow', '#ffd400'], ['Red', '#e53935']];
 const thumbs = new WeakMap();
@@ -158,15 +160,40 @@ export default function Editor() {
     setBgColor(pixelAt(cur, (e.clientX - r.left) / scale, (e.clientY - r.top) / scale)); setPicking(false);
   };
 
-  const doRemove = () => {
+  // reply({ok, note}) is how a voice command from chat hears the result.
+  const doRemove = (reply) => {
     setBusy(true);
     setTimeout(() => { // let "Working…" paint first
       const r = removeBackground(cur, {color: bgColor, tolerance: tol, soft, global});
-      if (r.removed < 0.0005) { setNote('Nothing matched. Raise the tolerance, or pick the background colour from the picture.'); setBusy(false); return; }
-      commit(r.canvas, r.removed > 0.97 ? 'Almost everything was removed. Undo, and lower the tolerance.' : `Background removed (${Math.round(r.removed * 100)}% of the picture). Click a piece and drag it, Shift-click to pick several, Delete removes. Not right? Undo, or Put background back.`, cur.__bg || cur);
+      if (r.removed < 0.0005) { const note = 'Nothing matched. Raise the tolerance, or pick the background colour from the picture.'; setNote(note); setBusy(false); reply && reply({ok: false, note}); return; }
+      const note = r.removed > 0.97 ? 'Almost everything was removed. Undo, and lower the tolerance.' : `Background removed (${Math.round(r.removed * 100)}% of the picture). Click a piece and drag it, Shift-click to pick several, Delete removes. Not right? Undo, or Put background back.`;
+      commit(r.canvas, note, cur.__bg || cur);
       setFormat('png'); setBusy(false); if (r.removed <= 0.97) setTool('pieces');
+      reply && reply({ok: r.removed <= 0.97, note});
     }, 20);
   };
+  // Commands from the chat that frames Studio (chat.flisk.si): "remove the background", "crop to square". See studio-embed.js.
+  const command = (m, reply) => {
+    if (!cur) { reply({ok: false, note: 'Open a photo in Studio first, then ask again.'}); return; }
+    if (busy) { reply({ok: false, note: 'Studio is still working. Ask again in a moment.'}); return; }
+    if (m.cmd === 'removeBackground') { setTool('bg'); doRemove(reply); return; }
+    if (m.cmd === 'crop') {
+      const row = RATIOS.find((r) => r[0] === m.ratio);
+      if (!row || !row[2]) { setTool('crop'); reply({ok: false, note: 'Which shape? Say square, 16:9, 4:3, 3:2, 3:4 or 9:16.'}); return; }
+      const box = fitRect(W, H, row[2]), w = Math.round(box.w), h = Math.round(box.h);
+      if (w === W && h === H) { reply({ok: false, note: `The photo is already ${row[1]}.`}); return; }
+      setTool('crop'); setRatio(row[0]);
+      const note = `Cropped to ${row[1]}: ${w} × ${h} px.`; commit(cropCanvas(cur, box), note); reply({ok: true, note});
+    }
+  };
+  const cmdRef = useRef(null); cmdRef.current = command;
+  useEffect(() => {
+    const m = (e) => {
+      if (!isChat(e.origin) || !e.data || e.data.flisk !== 'studio' || !e.data.cmd || e.data.type === 'reply') return;
+      cmdRef.current(e.data, (r) => e.source && e.source.postMessage({flisk: 'studio', type: 'reply', cmd: e.data.cmd, ...r}, e.origin));
+    };
+    window.addEventListener('message', m); return () => window.removeEventListener('message', m);
+  }, []);
   const doDownload = async () => {
     setBusy(true);
     try { const pending = tool === 'text' && txt.text.trim(), base = tool === 'pieces' && dirty && layers ? flat() : cur; const b = await exportBlob(pending ? addText(base, txt) : base, adj, {format, quality}); save(b, `${name}-edited.${format}`); setNote(`Saved ${name}-edited.${format} (${W} × ${H} px, ${kbs(b.size)}).`); }
@@ -240,7 +267,7 @@ export default function Editor() {
                 <Row label="Tolerance" value={tol}><Slider label="Tolerance" isLabelHidden min={2} max={80} value={tol} onChange={setTol} valueDisplay="none" /></Row>
                 <Row label="Edge softness" value={soft + ' px'}><Slider label="Edge softness" isLabelHidden min={0} max={6} value={soft} onChange={setSoft} valueDisplay="none" /></Row>
                 <label className="ed-check"><input type="checkbox" checked={global} onChange={(e) => setGlobal(e.target.checked)} /><span>Also clear the same colour inside the subject (holes, gaps)</span></label>
-                <Button label={busy ? 'Working…' : 'Remove background'} variant="primary" isDisabled={busy} onClick={doRemove} />
+                <Button label={busy ? 'Working…' : 'Remove background'} variant="primary" isDisabled={busy} onClick={() => doRemove()} />
                 {BackRow()}{BehindRow()}
               </>)}
 
