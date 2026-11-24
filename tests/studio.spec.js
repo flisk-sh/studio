@@ -12,6 +12,11 @@ test.describe('layout', () => {
     await task(page, 'Merge PDFs'); await expect(page.locator('.task-head h2')).toHaveText('Merge PDFs');
     await expect(page.locator('.side-item.on')).toContainText('Merge PDFs');
   });
+  test('the task is kept in the URL, and back and a pasted link switch it', async ({page}) => {
+    await task(page, 'Merge PDFs'); await expect(page).toHaveURL(/#merge$/);
+    await page.goBack(); await expect(page.locator('.task-head h2')).toHaveText('Photos');
+    await page.evaluate(() => { location.hash = 'shrink'; }); await expect(page.locator('.task-head h2')).toHaveText('Shrink PDFs');
+  });
   test('no horizontal scroll on a phone', async ({page}) => {
     await page.setViewportSize({width: 375, height: 812}); await page.reload();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

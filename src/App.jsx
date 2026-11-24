@@ -165,7 +165,12 @@ export default function App() {
   const onFiles = (v) => setFiles((old) => { const add = (v ? [].concat(v) : []).filter((f) => !old.some((o) => o.name === f.name && o.size === f.size && o.lastModified === f.lastModified)); return old.concat(add); });
   const removeAt = (i) => setFiles((old) => old.filter((_, j) => j !== i));
   const moveAt = (i, d) => setFiles((old) => { const n = old.slice(); const [x] = n.splice(i, 1); n.splice(i + d, 0, x); return n; });
-  const pick = (t) => { setTask(t); setFiles([]); setLog(''); setResult(null); setQuality(t === 'shrink' ? 60 : 82); };
+  const pick = (t) => { setTask(t); setFiles([]); setLog(''); setResult(null); setQuality(t === 'shrink' ? 60 : 82); if (location.hash.slice(1) !== t) history.pushState(null, '', '#' + t); };
+  // Back/forward and a pasted #editor link switch the task too.
+  useEffect(() => {
+    const onHash = () => { const t = startTask(); setTask((old) => { if (old === t) return old; setFiles([]); setLog(''); setResult(null); setQuality(t === 'shrink' ? 60 : 82); return t; }); };
+    window.addEventListener('hashchange', onHash); return () => window.removeEventListener('hashchange', onHash);
+  }, []);
   const run = async () => {
     let list = files;
     if (!unlocked && list.length > FREE_FILES) { list = list.slice(0, FREE_FILES); }
