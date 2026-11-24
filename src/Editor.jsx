@@ -3,15 +3,19 @@ import {Button} from '@astryxdesign/core/Button';
 import {Text} from '@astryxdesign/core/Text';
 import {Slider} from '@astryxdesign/core/Slider';
 import {NumberInput} from '@astryxdesign/core/NumberInput';
+import {TextInput} from '@astryxdesign/core/TextInput';
 import {Banner} from '@astryxdesign/core/Banner';
 import {VStack, HStack} from '@astryxdesign/core/Stack';
-import {SparklesIcon, ScissorsIcon, ArrowPathIcon, AdjustmentsHorizontalIcon, ArrowsPointingOutIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, ArrowDownTrayIcon, PhotoIcon} from '@heroicons/react/24/outline';
-import {NEUTRAL, FILTER_OK, MAX_EDGE, loadCanvas, cropCanvas, rotateCanvas, flipCanvas, resizeCanvas, fitRect, dragCorner, moveRect, pixelAt, hex, borderColor, removeBackground, filterCss, isNeutral, exportBlob} from './editor-engine.js';
+import {SparklesIcon, ScissorsIcon, ArrowPathIcon, AdjustmentsHorizontalIcon, ArrowsPointingOutIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, ArrowDownTrayIcon, PhotoIcon, PencilSquareIcon} from '@heroicons/react/24/outline';
+import {NEUTRAL, FILTER_OK, MAX_EDGE, loadCanvas, cropCanvas, rotateCanvas, flipCanvas, resizeCanvas, addText, drawText, fitRect, dragCorner, moveRect, pixelAt, hex, borderColor, removeBackground, filterCss, isNeutral, exportBlob} from './editor-engine.js';
 
-const TOOLS = [['bg', 'Remove background', SparklesIcon], ['crop', 'Crop', ScissorsIcon], ['turn', 'Rotate & flip', ArrowPathIcon], ['adjust', 'Adjust', AdjustmentsHorizontalIcon], ['size', 'Resize', ArrowsPointingOutIcon]];
+const TOOLS = [['bg', 'Remove background', SparklesIcon], ['crop', 'Crop', ScissorsIcon], ['turn', 'Rotate & flip', ArrowPathIcon], ['adjust', 'Adjust', AdjustmentsHorizontalIcon], ['size', 'Resize', ArrowsPointingOutIcon], ['text', 'Text', PencilSquareIcon]];
 const RATIOS = [['free', 'Free', null], ['1:1', '1:1', 1], ['4:3', '4:3', 4 / 3], ['3:2', '3:2', 3 / 2], ['16:9', '16:9', 16 / 9], ['3:4', '3:4', 3 / 4], ['9:16', '9:16', 9 / 16]];
 const LOOKS = [['Original', NEUTRAL], ['Vivid', {...NEUTRAL, contrast: 112, saturation: 140}], ['Warm', {...NEUTRAL, sepia: 30, saturation: 115, brightness: 104}], ['Soft', {...NEUTRAL, contrast: 88, brightness: 106, blur: 0.6}], ['Black & white', {...NEUTRAL, gray: 100, contrast: 108}], ['Sepia', {...NEUTRAL, sepia: 85}]];
 const HISTORY = 8;
+const COLORS = [['White', '#ffffff'], ['Black', '#000000'], ['Red', '#e53935'], ['Yellow', '#ffd400'], ['Green', '#2f9e5b']];
+const POS = [['tl', 'Top left'], ['tc', 'Top centre'], ['tr', 'Top right'], ['ml', 'Middle left'], ['mc', 'Middle centre'], ['mr', 'Middle right'], ['bl', 'Bottom left'], ['bc', 'Bottom centre'], ['br', 'Bottom right']];
+const TEXT0 = {text: '', size: 6, color: '#ffffff', pos: 'bc', bold: true, outline: true, opacity: 100};
 const save = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); };
 const kbs = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : (n / 1024).toFixed(0) + ' KB';
 
@@ -31,7 +35,7 @@ export default function Editor() {
   const [zoom, setZoom] = useState(null), [fitScale, setFitScale] = useState(1);
   const [crop, setCrop] = useState(null), [ratio, setRatio] = useState('free');
   const [bgColor, setBgColor] = useState(null), [picking, setPicking] = useState(false), [tol, setTol] = useState(24), [soft, setSoft] = useState(1), [global, setGlobal] = useState(false);
-  const [rw, setRw] = useState(0);
+  const [rw, setRw] = useState(0), [txt, setTxt] = useState(TEXT0);
   const [format, setFormat] = useState('png'), [quality, setQuality] = useState(90);
   const [busy, setBusy] = useState(false), [over, setOver] = useState(false);
   const cur = hist.cur, W = cur ? cur.width : 0, H = cur ? cur.height : 0;
@@ -54,7 +58,7 @@ export default function Editor() {
   };
 
   // The visible canvas is a copy of the current picture; CSS applies the adjustments live.
-  useEffect(() => { const c = canvasRef.current; if (!c || !cur) return; c.width = cur.width; c.height = cur.height; c.getContext('2d').drawImage(cur, 0, 0); }, [cur]);
+  useEffect(() => { const c = canvasRef.current; if (!c || !cur) return; c.width = cur.width; c.height = cur.height; const g = c.getContext('2d'); g.drawImage(cur, 0, 0); if (tool === 'text') drawText(g, cur.width, cur.height, txt); }, [cur, tool, txt]);
   useEffect(() => { if (cur) setRw(cur.width); }, [cur]);
   // "Fit" follows the size of the stage.
   useEffect(() => {
@@ -107,7 +111,7 @@ export default function Editor() {
   };
   const doDownload = async () => {
     setBusy(true);
-    try { const b = await exportBlob(cur, adj, {format, quality}); save(b, `${name}-edited.${format}`); setNote(`Saved ${name}-edited.${format} (${W} × ${H} px, ${kbs(b.size)}).`); }
+    try { const pending = tool === 'text' && txt.text.trim(); const b = await exportBlob(pending ? addText(cur, txt) : cur, adj, {format, quality}); save(b, `${name}-edited.${format}`); setNote(`Saved ${name}-edited.${format} (${W} × ${H} px, ${kbs(b.size)}).`); }
     catch (e) { setNote(String(e.message || e)); }
     setBusy(false);
   };
@@ -204,6 +208,16 @@ export default function Editor() {
                 <Text type="supporting" color="secondary">Height follows: {Math.round(H * rw / W)} px. Proportions stay the same.</Text>
                 <HStack gap={2} wrap="wrap">{[['25%', W * .25], ['50%', W * .5], ['75%', W * .75], ['1080 wide', 1080], ['1920 wide', 1920]].map(([l, w]) => <Button key={l} label={l} size="sm" variant="secondary" onClick={() => setRw(Math.round(Math.min(MAX_EDGE, w)))} />)}</HStack>
                 <Button label="Apply size" variant="primary" isDisabled={rw === W} onClick={() => applyResize(rw)} />
+              </>)}
+
+              {tool === 'text' && (<>
+                <TextInput label="Text" value={txt.text} onChange={(v) => setTxt((t) => ({...t, text: v}))} />
+                <Row label="Size" value={txt.size + '%'}><Slider label="Text size" isLabelHidden min={2} max={30} value={txt.size} onChange={(v) => setTxt((t) => ({...t, size: v}))} valueDisplay="none" /></Row>
+                <Row label="Colour" value=""><HStack gap={2} wrap="wrap">{COLORS.map(([l, v]) => <Button key={l} label={l} size="sm" variant={txt.color === v ? 'primary' : 'secondary'} onClick={() => setTxt((t) => ({...t, color: v}))} />)}</HStack></Row>
+                <Row label="Position" value=""><div className="ed-pos" role="group" aria-label="Text position">{POS.map(([id, l]) => <button type="button" key={id} aria-label={l} aria-pressed={txt.pos === id} className={'ed-pos-b' + (txt.pos === id ? ' on' : '')} onClick={() => setTxt((t) => ({...t, pos: id}))} />)}</div></Row>
+                <Row label="Opacity" value={txt.opacity + '%'}><Slider label="Text opacity" isLabelHidden min={20} max={100} value={txt.opacity} onChange={(v) => setTxt((t) => ({...t, opacity: v}))} valueDisplay="none" /></Row>
+                <HStack gap={4}><label className="ed-check"><input type="checkbox" checked={txt.bold} onChange={(e) => setTxt((t) => ({...t, bold: e.target.checked}))} /><span>Bold</span></label><label className="ed-check"><input type="checkbox" checked={txt.outline} onChange={(e) => setTxt((t) => ({...t, outline: e.target.checked}))} /><span>Outline, easier to read</span></label></HStack>
+                <Button label="Apply text" variant="primary" isDisabled={!txt.text.trim()} onClick={() => { commit(addText(cur, txt), 'Text added.'); setTxt((t) => ({...t, text: ''})); }} />
               </>)}
 
               <div className="ed-export">

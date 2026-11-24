@@ -9,7 +9,7 @@ Resize, compress and watermark photos and PDFs in your browser. Your files never
 | Task | What you get |
 |------|--------------|
 | Photos | Resize to a size you choose, crop square, compress, add a text mark, download a ZIP. Save as JPEG (smaller) or PNG (sharp text). |
-| Editor | Edit one photo: remove a plain background, crop to a shape, rotate and flip, adjust light and colour, resize. Save as PNG (keeps transparency), JPEG or WebP. Undo and redo. |
+| Editor | Edit one photo: remove a plain background, crop to a shape, rotate and flip, adjust light and colour, add text, resize. Save as PNG (keeps transparency), JPEG or WebP. Undo and redo. |
 | Merge PDFs | Join several PDFs into one file. |
 | Shrink PDFs | Make big PDFs small. Pages are re-drawn as images, which also removes hidden text and metadata, so the text can no longer be selected. |
 | Watermark PDFs | Put your text across every page. |

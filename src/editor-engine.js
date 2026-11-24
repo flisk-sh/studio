@@ -105,6 +105,21 @@ export function removeBackground(src, {color, tolerance = 24, soft = 1, global =
   return {canvas: out, removed: removed / n};
 }
 
+// Text on the picture: a caption or watermark. t = {text, size (% of width), color, pos 'tl'..'br', bold, outline, opacity}.
+export function drawText(g, W, H, t) {
+  const lines = t.text.split('\n').filter((l, i, a) => l.trim() || i < a.length - 1); if (!t.text.trim()) return;
+  const px = Math.max(8, Math.round(W * t.size / 100)), lh = px * 1.2, m = Math.max(12, px * 0.6);
+  g.save(); g.font = `${t.bold ? 700 : 500} ${px}px system-ui, -apple-system, "Segoe UI", sans-serif`; g.textBaseline = 'top'; g.globalAlpha = t.opacity / 100; g.lineJoin = 'round';
+  const bw = Math.max(...lines.map((l) => g.measureText(l).width)), bh = lines.length * lh, col = t.pos[1], row = t.pos[0];
+  const bx = col === 'l' ? m : col === 'r' ? W - m - bw : (W - bw) / 2, by = row === 't' ? m : row === 'b' ? H - m - bh : (H - bh) / 2;
+  g.textAlign = col === 'l' ? 'left' : col === 'r' ? 'right' : 'center';
+  const ax = col === 'l' ? bx : col === 'r' ? bx + bw : bx + bw / 2;
+  const [r, gr, b] = [1, 3, 5].map((i) => parseInt(t.color.slice(i, i + 2), 16)), dark = (0.299 * r + 0.587 * gr + 0.114 * b) < 140;
+  lines.forEach((l, i) => { const y = by + i * lh; if (t.outline) { g.strokeStyle = dark ? '#fff' : '#000'; g.lineWidth = Math.max(2, px / 7); g.strokeText(l, ax, y); } g.fillStyle = t.color; g.fillText(l, ax, y); });
+  g.restore();
+}
+export const addText = (src, t) => { const c = copyCanvas(src); drawText(c.getContext('2d'), c.width, c.height, t); return c; };
+
 // Live and export use the same recipe. `scale` turns image pixels into the pixels of the surface it is drawn on (for blur).
 export const filterCss = (a, scale = 1) => `brightness(${a.brightness}%) contrast(${a.contrast}%) saturate(${a.saturation}%) grayscale(${a.gray}%) sepia(${a.sepia}%) blur(${(a.blur * scale).toFixed(2)}px)`;
 export const isNeutral = (a) => Object.keys(NEUTRAL).every((k) => a[k] === NEUTRAL[k]);

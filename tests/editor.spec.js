@@ -84,4 +84,20 @@ test.describe('editor', () => {
     await give(page, [{kind: 'raw', name: 'x.png', type: 'image/png', bytes: [1, 2, 3]}]);
     await expect(page.getByText(/could not be read/)).toBeVisible();
   });
+  const ink = (page, x, y, w, h) => page.evaluate(([x, y, w, h]) => { const d = document.querySelector('.ed-canvas').getContext('2d').getImageData(x, y, w, h).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n; }, [x, y, w, h]);
+  test('text shows live, then is added to the picture', async ({page}) => {
+    await open(page, {name: 'p.png', w: 400, h: 300, draw: 'transparent'}); await tool(page, 'Text');
+    expect(await ink(page, 0, 0, 120, 60)).toBe(0);
+    await page.getByRole('button', {name: 'Top left'}).click(); await page.getByLabel('Text', {exact: true}).fill('Hello');
+    expect(await ink(page, 0, 0, 120, 60)).toBeGreaterThan(50);
+    await page.getByRole('button', {name: 'Apply text'}).click(); await expect(page.getByText('Text added.')).toBeVisible();
+    await tool(page, 'Crop'); expect(await ink(page, 0, 0, 120, 60)).toBeGreaterThan(50);
+  });
+  test('Ukrainian text works, and a download includes text you have not applied yet', async ({page}) => {
+    await open(page, {name: 'u.png', w: 400, h: 300, draw: 'transparent'}); await tool(page, 'Text');
+    await page.getByLabel('Text', {exact: true}).fill('Конфіденційно');
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: 'Download', exact: true}).click()]);
+    const parts = []; for await (const c of await dl.createReadStream()) parts.push(c);
+    expect(Buffer.concat(parts).length).toBeGreaterThan(1500); // a 400x300 PNG that is mostly empty would be far smaller
+  });
 });
