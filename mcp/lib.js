@@ -30,10 +30,19 @@ export async function safeOut(dir, name, overwrite, inputs) {
   return n;
 }
 
-async function textPng(text, px) {
+/**
+ * @param {string} text
+ * @param {number} px
+ * @param {{width: number, height: number}} [bounds]
+ */
+async function textPng(text, px, bounds) {
   const w = Math.ceil(text.length * px * 0.7) + 16, h = Math.ceil(px * 1.5);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><text x="8" y="${px * 1.1}" font-family="sans-serif" font-weight="700" font-size="${px}" fill="#808080">${esc(text)}</text></svg>`;
-  return sharp(Buffer.from(svg)).png().toBuffer();
+  const image = sharp(Buffer.from(svg));
+  if (bounds && (w > bounds.width || h > bounds.height)) {
+    image.resize({...bounds, fit: 'inside'});
+  }
+  return image.png().toBuffer();
 }
 
 export async function resizePhotos({paths, outDir, size = 1200, square = false, format = 'jpg', quality = 82, watermark = '', overwrite = false}) {
@@ -47,9 +56,11 @@ export async function resizePhotos({paths, outDir, size = 1200, square = false, 
     if (square) { const s = Math.min(w, h, size); img = img.resize(s, s, {fit: 'cover'}); }
     else img = img.resize({width: size, height: size, fit: 'inside', withoutEnlargement: true});
     if (format === 'jpg') img = img.flatten({background: '#ffffff'}); // transparent PNGs become white, not black
-    let buf = await img.toBuffer();
+    const {data, info: resized} = await img.toBuffer({resolveWithObject: true});
+    let buf = data;
     if (watermark) {
-      const m = await sharp(buf).metadata(); const mark = await textPng(watermark, Math.max(14, Math.round(m.width / 22)));
+      const {width, height} = resized;
+      const mark = await textPng(watermark, Math.max(14, Math.round(width / 22)), {width, height});
       buf = await sharp(buf).composite([{input: mark, gravity: 'centre', blend: 'over'}]).toBuffer();
     }
     const out = await safeOut(resolve(outDir), basename(src, extname(src)) + (format === 'png' ? '.png' : '.jpg'), overwrite, inputs);

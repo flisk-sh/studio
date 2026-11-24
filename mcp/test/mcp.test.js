@@ -74,6 +74,23 @@ test('merge, info, watermark', async () => {
   assert.equal(w.pages, 5); assert.ok((await readFile(w.output)).length > (await readFile(m.output)).length); await c.close();
 });
 
+test('resize: fits a long watermark onto a small photo', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'studio-'));
+  t.after(() => rm(dir, {recursive: true, force: true}));
+  const c = await connect();
+  t.after(() => c.close());
+  const input = join(dir, 'small.png');
+  await sharp({create: {width: 96, height: 32, channels: 3, background: '#fff'}}).png().toFile(input);
+  const r = await c.callTool({name: 'resize_photos', arguments: {
+    paths: [input], outDir: join(dir, 'out'), format: 'png', watermark: 'Internal review copy only',
+  }});
+  assert.notEqual(r.isError, true, JSON.stringify(r.content));
+  const [{output, width, height}] = json(r);
+  assert.deepEqual([width, height], [96, 32]);
+  const pixels = await sharp(output).removeAlpha().raw().toBuffer();
+  assert.ok(pixels.some((channel) => channel < 255), 'the watermark changed the white image');
+});
+
 test('a bad file gives an error result, not a crash', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'studio-')); const c = await connect(); await writeFile(join(dir, 'x.pdf'), 'hello');
   const r = await c.callTool({name: 'pdf_info', arguments: {path: join(dir, 'x.pdf')}}); assert.equal(r.isError, true);
