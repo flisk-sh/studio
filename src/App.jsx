@@ -21,6 +21,8 @@ const TASKS = [
   ['mark', 'Watermark PDFs', 'Put your text across every page'],
 ];
 const unlockedAtLoad = initUnlock();
+// ?embed=1: Studio inside chat.flisk.si, without the side panel (chat opens the right tool and sends it commands).
+const EMBED = new URLSearchParams(location.search).get('embed') === '1';
 const save = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); };
 const Choice = ({value, set, options}) => (
   <HStack gap={2} wrap="wrap">{options.map(([id, label]) => <Button key={id} label={label} size="sm" variant={value === id ? 'primary' : 'secondary'} onClick={() => set(id)} />)}</HStack>
@@ -186,7 +188,7 @@ export default function App() {
 
   const cur = TASKS.find((t) => t[0] === task);
   return (
-    <div className="shell">
+    <div className={'shell' + (EMBED ? ' embed' : '')}>
       <div className="body">
         <nav className="side" aria-label="Tasks">
           <div className="side-h">Tasks</div>
