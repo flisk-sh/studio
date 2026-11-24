@@ -6,6 +6,7 @@ import {VStack, HStack} from '@astryxdesign/core/Stack';
 import {FileInput} from '@astryxdesign/core/FileInput';
 import {NumberInput} from '@astryxdesign/core/NumberInput';
 import {TextInput} from '@astryxdesign/core/TextInput';
+import {Slider} from '@astryxdesign/core/Slider';
 import {Banner} from '@astryxdesign/core/Banner';
 import {PhotoIcon, DocumentDuplicateIcon, ArrowsPointingInIcon, PencilSquareIcon, ArrowUpRightIcon, ChevronDownIcon, ChevronUpIcon, XMarkIcon} from '@heroicons/react/24/outline';
 import {Demo} from './Demos.jsx';
@@ -59,6 +60,19 @@ const kbs = (n) => (n / 1024).toFixed(0) + ' KB';
 function Viewer({result, onClose}) {
   const [open, setOpen] = useState(0);
   const it = result.items[Math.min(open, result.items.length - 1)];
+  // Zoom: null means "fit the frame"; a number is a percentage of the image's own pixels.
+  const [zoom, setZoom] = useState(null), [nat, setNat] = useState(null), [fitPct, setFitPct] = useState(100);
+  const stageRef = useRef(null);
+  const onLoad = (e) => {
+    const im = e.currentTarget;
+    setNat([im.naturalWidth, im.naturalHeight]);
+  };
+  // In "fit" mode the browser scales the image; read the result back so the slider shows the real percentage.
+  useEffect(() => {
+    const im = stageRef.current && stageRef.current.querySelector('img');
+    if (zoom === null && nat && im) setFitPct(Math.max(1, Math.round(im.clientWidth / nat[0] * 100)));
+  }, [zoom, nat]);
+  const pick = (i) => { setOpen(i); setZoom(null); setNat(null); };
   return (
     <VStack gap={3} className="viewer">
       <HStack gap={2} align="center" wrap="wrap">
@@ -67,13 +81,23 @@ function Viewer({result, onClose}) {
       </HStack>
       {result.items.length > 1 && (
         <div className="thumbs">{result.items.map((x, i) => (
-          <button type="button" key={x.url} className={'thumb' + (i === open ? ' on' : '')} onClick={() => setOpen(i)} title={x.name}>
+          <button type="button" key={x.url} className={'thumb' + (i === open ? ' on' : '')} onClick={() => pick(i)} title={x.name}>
             {x.kind === 'image' ? <img src={x.url} alt={x.name} /> : <span className="pdfchip">{x.name}</span>}
           </button>))}
         </div>)}
       <Downloads key={result.blob.size + result.name + result.items.length} result={result} />
-      <div className="stage">
-        {it.kind === 'image' ? <img src={it.url} alt={it.name} /> : <iframe title={it.name} src={it.url} />}
+      {it.kind === 'image' && (
+        <HStack gap={3} align="center" className="zoombar">
+          <Text type="supporting" color="secondary">Zoom</Text>
+          <div className="zoom-slider"><Slider label="Zoom" isLabelHidden min={5} max={400} step={5} value={zoom ?? fitPct} onChange={(v) => setZoom(v)} valueDisplay="none" /></div>
+          <Text weight="semibold" className="zoom-pct">{zoom ?? fitPct}%</Text>
+          <Button label="Fit" size="sm" variant={zoom === null ? 'primary' : 'secondary'} onClick={() => setZoom(null)} />
+          <Button label="100%" size="sm" variant={zoom === 100 ? 'primary' : 'secondary'} onClick={() => setZoom(100)} />
+        </HStack>)}
+      <div className={'stage' + (it.kind === 'image' ? ' canvas' : '')} ref={stageRef}>
+        {it.kind === 'image'
+          ? <div className="frame"><img src={it.url} alt={it.name} onLoad={onLoad} className={zoom === null ? '' : 'zoomed'} style={zoom !== null && nat ? {width: Math.round(nat[0] * zoom / 100), maxWidth: 'none', maxHeight: 'none'} : undefined} /></div>
+          : <iframe title={it.name} src={it.url} />}
       </div>
       {it.kind === 'image' && Math.max(...String(it.dims).split(' × ').map(Number)) < 1000 && <Banner type="warning" description="This is small. Text may be hard to read. Close this, set 1600 px or more (PNG for text) and run again; your files are still selected." />}
       <Text type="supporting" color="secondary">{it.name}{it.dims ? ' · ' + it.dims + ' px' : ''}{it.before ?` · ${kbs(it.before)} → ${kbs(it.after)}` : ''}</Text>
@@ -183,18 +207,35 @@ export default function App() {
               </VStack>
             )}
             {mode === 'photo' ? (
-              <VStack gap={3}>
-                <NumberInput label="Size in pixels (longest side, or the square)" value={size} onChange={(v) => v && setSize(v)} />
-                <HStack gap={2} wrap="wrap">{[[500, 'Thumbnail 500'], [1200, 'Web 1200'], [2000, 'Documents 2000']].map(([v, l]) => <Button key={v} label={l} size="sm" variant={size === v ? 'primary' : 'secondary'} onClick={() => setSize(v)} />)}</HStack>
-                {size < 1000 && <Text type="supporting" color="warning">Small size: text in documents, screenshots and photos of paper will be hard to read. Use 1600 px or more, and PNG, for anything with text.</Text>}
-                <Choice value={square} set={setSquare} options={[['fit', 'Keep proportions'], ['square', 'Square crop']]} />
-                <Choice value={format} set={setFormat} options={[['jpg', 'JPEG (smaller)'], ['png', 'PNG (sharp text)'], ['webp', 'WebP (smallest)']]} />
-                <NumberInput label="JPEG quality, %" value={quality} onChange={(v) => v && setQuality(Math.min(100, Math.max(30, v)))} />
-              </VStack>
+              <section className="inspector" aria-label="Photo settings">
+                <div className="inspector-h">Inspector</div>
+                <VStack gap={4}>
+                  <fieldset className="insp-group"><legend>Size</legend>
+                    <VStack gap={3}>
+                      <NumberInput label="Size in pixels (longest side, or the square)" value={size} onChange={(v) => v && setSize(v)} />
+                      <HStack gap={2} wrap="wrap">{[[500, 'Thumbnail 500'], [1200, 'Web 1200'], [2000, 'Documents 2000']].map(([v, l]) => <Button key={v} label={l} size="sm" variant={size === v ? 'primary' : 'secondary'} onClick={() => setSize(v)} />)}</HStack>
+                      {size < 1000 && <Text type="supporting" color="warning">Small size: text in documents, screenshots and photos of paper will be hard to read. Use 1600 px or more, and PNG, for anything with text.</Text>}
+                      <Choice value={square} set={setSquare} options={[['fit', 'Keep proportions'], ['square', 'Square crop']]} />
+                    </VStack>
+                  </fieldset>
+                  <fieldset className="insp-group"><legend>Format</legend>
+                    <VStack gap={3}>
+                      <Choice value={format} set={setFormat} options={[['jpg', 'JPEG (smaller)'], ['png', 'PNG (sharp text)'], ['webp', 'WebP (smallest)']]} />
+                      <HStack gap={3} align="center">
+                        <div className="insp-slider"><Slider label="JPEG quality slider" isLabelHidden min={30} max={100} value={quality} onChange={(v) => setQuality(v)} valueDisplay="none" /></div>
+                        <div className="insp-num"><NumberInput label="JPEG quality, %" value={quality} onChange={(v) => v && setQuality(Math.min(100, Math.max(30, v)))} /></div>
+                      </HStack>
+                    </VStack>
+                  </fieldset>
+                  <fieldset className="insp-group"><legend>Mark</legend>
+                    <TextInput label="Watermark text (optional)" value={mark} onChange={setMark} />
+                  </fieldset>
+                </VStack>
+              </section>
             ) : task === 'shrink' ? (
               <NumberInput label="Shrink quality, %" value={quality} onChange={(v) => v && setQuality(Math.min(95, Math.max(20, v)))} />
             ) : null}
-            <TextInput label="Watermark text (optional)" value={mark} onChange={setMark} />
+            {mode !== 'photo' && <TextInput label="Watermark text (optional)" value={mark} onChange={setMark} />}
             <Button label={busy ? 'Working…' : 'Process'} variant="primary" size="lg" isDisabled={busy || !files.length} onClick={run} />
             {log && <Text color="secondary">{log}</Text>}
             {result && <Viewer result={result} onClose={() => setResult(null)} />}

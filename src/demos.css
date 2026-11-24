@@ -76,7 +76,19 @@
 .thumb.on{border-color:currentColor}.thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .pdfchip{display:block;font-size:10px;padding:4px;word-break:break-all}
 .stage{border:1px solid color-mix(in srgb,currentColor 16%,transparent);border-radius:12px;overflow:hidden;background:color-mix(in srgb,currentColor 4%,transparent)}
-.stage img{display:block;max-width:100%;max-height:70vh;margin:0 auto}.stage iframe{display:block;width:100%;height:70vh;border:0}
+.stage img{display:block;max-width:100%;max-height:70vh;margin:0 auto}
+/* canvas-style preview: a muted backdrop, a framed image you zoom (after Astryx's Canvas Editor template) */
+.stage.canvas{overflow:auto;max-height:70vh;padding:20px;background:color-mix(in srgb,currentColor 9%,transparent)}
+.stage.canvas .frame{width:max-content;min-width:100%;display:flex;justify-content:center}
+.stage.canvas img{box-shadow:0 1px 3px rgba(0,0,0,.35),0 8px 28px rgba(0,0,0,.28);border-radius:2px;margin:0;background:#fff;flex:none}
+.stage.canvas img.zoomed{max-width:none;max-height:none}
+.zoombar{width:100%}.zoom-slider{flex:1;min-width:120px}.zoom-pct{min-width:4ch;text-align:right}
+/* inspector: the photo settings grouped in one panel */
+.inspector{border:1px solid color-mix(in srgb,currentColor 16%,transparent);border-radius:12px;padding:14px 16px 18px;background:color-mix(in srgb,currentColor 3%,transparent)}
+.inspector-h{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.55;margin-bottom:10px}
+.insp-group{margin:0;padding:0;border:0;min-width:0}.insp-group legend{float:left;width:100%;font-size:12px;font-weight:600;opacity:.7;padding:0 0 8px}.insp-group>*{clear:both}
+.insp-group+.insp-group{border-top:1px solid color-mix(in srgb,currentColor 12%,transparent);padding-top:12px}
+.insp-slider{flex:1;min-width:120px}.insp-num{width:110px;flex:none}.stage iframe{display:block;width:100%;height:70vh;border:0}
 
 /* merged header + left side panel (design: mock20, "Merged header + left side panel") */
 :root{--accent:#2f9e5b}
