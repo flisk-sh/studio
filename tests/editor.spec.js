@@ -100,4 +100,53 @@ test.describe('editor', () => {
     const parts = []; for await (const c of await dl.createReadStream()) parts.push(c);
     expect(Buffer.concat(parts).length).toBeGreaterThan(1500); // a 400x300 PNG that is mostly empty would be far smaller
   });
+  const twin = (page) => open(page, {name: 'twin.png', w: 400, h: 300, draw: 'twin'});
+  const removeBg = async (page) => { await page.getByRole('button', {name: 'Remove background'}).click(); await expect(page.getByText(/Background removed/)).toBeVisible(); };
+  const frame = (page) => page.locator('.ed-canvas').boundingBox();
+  const drag = async (page, from, to) => { const b = await frame(page); await page.mouse.move(b.x + from[0], b.y + from[1]); await page.mouse.down(); await page.mouse.move(b.x + to[0], b.y + to[1], {steps: 6}); await page.mouse.up(); };
+  test('after removing a background the pieces can be dragged with the mouse', async ({page}) => {
+    await twin(page); await removeBg(page);
+    await expect(page.getByRole('tab', {name: 'Move pieces'})).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByText('2 pieces')).toBeVisible();
+    expect((await px(page, 70, 130))[3]).toBe(255); expect((await px(page, 170, 130))[3]).toBe(0);
+    await drag(page, [70, 130], [170, 130]);
+    expect((await px(page, 70, 130))[3]).toBe(0); expect((await px(page, 170, 130))[3]).toBe(255);
+    expect((await px(page, 290, 130))[3]).toBe(255); // the other piece did not move
+    await page.getByRole('button', {name: 'Undo'}).click(); expect((await px(page, 70, 130))[3]).toBe(255);
+  });
+  test('pick the pieces to keep, delete the rest', async ({page}) => {
+    await twin(page); await removeBg(page);
+    const b = await frame(page); await page.mouse.click(b.x + 70, b.y + 130);
+    await page.getByRole('button', {name: 'Keep only selected'}).click();
+    expect((await px(page, 70, 130))[3]).toBe(255); expect((await px(page, 290, 130))[3]).toBe(0);
+    await page.getByRole('button', {name: 'Apply', exact: true}).click(); await expect(page.getByText('Pieces applied.')).toBeVisible();
+    await expect(page.getByText('1 piece', {exact: true})).toBeVisible();
+  });
+  test('Delete key removes the clicked piece; Shift-click picks two', async ({page}) => {
+    await twin(page); await removeBg(page);
+    const b = await frame(page); await page.mouse.click(b.x + 70, b.y + 130); await page.keyboard.press('Delete');
+    expect((await px(page, 70, 130))[3]).toBe(0); expect((await px(page, 290, 130))[3]).toBe(255);
+    await page.getByRole('button', {name: 'Undo'}).click();
+    await page.mouse.click(b.x + 70, b.y + 130); await page.keyboard.down('Shift'); await page.mouse.click(b.x + 290, b.y + 130); await page.keyboard.up('Shift');
+    await page.getByRole('button', {name: 'Delete selected'}).click();
+    await expect(page.getByText(/Nothing visible is left/)).toBeVisible();
+  });
+  test('Put background back restores the original picture', async ({page}) => {
+    await twin(page); await removeBg(page);
+    expect((await px(page, 5, 5))[3]).toBe(0);
+    await page.getByRole('button', {name: 'Put background back'}).click();
+    expect((await px(page, 5, 5))[3]).toBe(255);
+  });
+  test('the brush restores the background only where you paint', async ({page}) => {
+    await twin(page); await removeBg(page); await tool(page, 'Brush');
+    await drag(page, [150, 50], [250, 50]);
+    expect((await px(page, 200, 50))[3]).toBe(255); expect((await px(page, 200, 250))[3]).toBe(0);
+    await page.getByRole('button', {name: 'Erase'}).click(); await drag(page, [60, 120], [80, 140]);
+    expect((await px(page, 70, 130))[3]).toBe(0);
+  });
+  test('a colour can be put behind the removed background', async ({page}) => {
+    await twin(page); await removeBg(page);
+    await page.getByRole('button', {name: 'Put black behind the picture'}).click();
+    const c = await px(page, 5, 5); expect(c[3]).toBe(255); expect(c[0]).toBe(0);
+  });
 });
