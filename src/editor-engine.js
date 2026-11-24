@@ -134,3 +134,53 @@ export async function exportBlob(src, adj, {format, quality}) {
   if (!blob) throw new Error('This browser could not make a ' + format.toUpperCase() + ' file. Try PNG.');
   return blob;
 }
+
+// ---- Pieces and layers -------------------------------------------------------------------------
+// After a background is removed, the picture is often several separate things. findPieces cuts the picture into one
+// layer per connected group of visible pixels (specks too small to matter are dropped), largest first, so small pieces sit on top.
+let pieceId = 0;
+export function findPieces(src) {
+  const {width: w, height: h} = src, n = w * h, d = src.getContext('2d', {willReadFrequently: true}).getImageData(0, 0, w, h).data;
+  const lab = new Int32Array(n), q = new Int32Array(n), boxes = [], minArea = Math.max(6, Math.round(n * 0.00002));
+  for (let s = 0; s < n; s++) {
+    if (lab[s] || d[s * 4 + 3] < 8) continue;
+    const id = boxes.length + 1; let head = 0, tail = 0, x0 = w, y0 = h, x1 = -1, y1 = -1; lab[s] = id; q[tail++] = s;
+    while (head < tail) {
+      const p = q[head++], x = p % w, y = (p - x) / w;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      for (let dy = -1; dy <= 1; dy++) { const yy = y + dy; if (yy < 0 || yy >= h) continue;
+        for (let dx = -1; dx <= 1; dx++) { const xx = x + dx; if (xx < 0 || xx >= w) continue; const r = yy * w + xx; if (!lab[r] && d[r * 4 + 3] >= 8) { lab[r] = id; q[tail++] = r; } } }
+    }
+    boxes.push({id, x0, y0, x1, y1, area: tail});
+  }
+  return boxes.filter((b) => b.area >= minArea).sort((a, b) => b.area - a.area).map((b) => {
+    const bw = b.x1 - b.x0 + 1, bh = b.y1 - b.y0 + 1, c = makeCanvas(bw, bh), g = c.getContext('2d'), img = g.createImageData(bw, bh);
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { const p = (b.y0 + y) * w + b.x0 + x; if (lab[p] === b.id) { const i = p * 4, j = (y * bw + x) * 4; img.data[j] = d[i]; img.data[j + 1] = d[i + 1]; img.data[j + 2] = d[i + 2]; img.data[j + 3] = d[i + 3]; } }
+    g.putImageData(img, 0, 0); return {id: ++pieceId, c, x: b.x0, y: b.y0};
+  });
+}
+// layers is bottom to top. fill (a colour or null) goes behind everything.
+export function drawLayers(g, layers, fill, W, H) {
+  if (fill) { g.fillStyle = fill; g.fillRect(0, 0, W, H); }
+  for (const l of layers) g.drawImage(l.c, Math.round(l.x), Math.round(l.y));
+}
+export function composeLayers(layers, fill, W, H) { const c = makeCanvas(W, H); drawLayers(c.getContext('2d'), layers, fill, W, H); return c; }
+// The topmost layer with a visible pixel at (x, y), or null.
+export function hitLayer(layers, x, y) {
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const l = layers[i], lx = Math.floor(x - Math.round(l.x)), ly = Math.floor(y - Math.round(l.y));
+    if (lx < 0 || ly < 0 || lx >= l.c.width || ly >= l.c.height) continue;
+    if (l.c.getContext('2d', {willReadFrequently: true}).getImageData(lx, ly, 1, 1).data[3] > 16) return l;
+  }
+  return null;
+}
+export const fillBehind = (src, color) => { const c = makeCanvas(src.width, src.height), g = c.getContext('2d'); g.fillStyle = color; g.fillRect(0, 0, c.width, c.height); g.drawImage(src, 0, 0); return c; };
+
+// Brush: 'erase' makes a spot transparent, 'restore' brings the original picture back there.
+export function stamp(g, x, y, r, mode, orig) {
+  g.save(); g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.clip(); g.clearRect(x - r, y - r, 2 * r, 2 * r); if (mode === 'restore') g.drawImage(orig, 0, 0); g.restore();
+}
+export function stampLine(g, a, b, r, mode, orig) {
+  const len = Math.hypot(b.x - a.x, b.y - a.y), steps = Math.max(1, Math.ceil(len / Math.max(1, r / 3)));
+  for (let i = 0; i <= steps; i++) stamp(g, a.x + (b.x - a.x) * i / steps, a.y + (b.y - a.y) * i / steps, r, mode, orig);
+}
