@@ -36,4 +36,17 @@ test.describe('embedded in chat', () => {
     await page.evaluate(() => window.dispatchEvent(new MessageEvent('message', {data: {flisk: 'studio', cmd: 'crop', ratio: '1:1'}, origin: 'https://evil.example'})));
     await expect(dims(page)).toContainText('400 × 300 px');
   });
+  test('the chat sets the look: dark from the address, light live from a message', async ({page}) => {
+    await page.goto('/?embed=1&mode=dark#editor');
+    const theme = () => page.evaluate(() => document.documentElement.dataset.theme);
+    await expect.poll(theme).toBe('dark');
+    await page.evaluate(() => window.postMessage({flisk: 'studio', type: 'mode', mode: 'light'}, location.origin));
+    await expect.poll(theme).toBe('light');
+  });
+  test('a look from another site is ignored', async ({page}) => {
+    await page.goto('/?embed=1&mode=dark#editor');
+    await page.evaluate(() => window.dispatchEvent(new MessageEvent('message', {data: {flisk: 'studio', type: 'mode', mode: 'light'}, origin: 'https://evil.example'})));
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+  });
 });
